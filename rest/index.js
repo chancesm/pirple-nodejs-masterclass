@@ -4,10 +4,10 @@
 const http = require('http');
 const url = require('url');
 const StringDecoder = require('string_decoder').StringDecoder;
+const config = require('./config');
 
-//  The server should respond to requests with a string
-const server = http.createServer((req, res) => {
-
+// HELPER FUNCTION ------------------------------------- //
+const getReqData = (req, body) => {
   // Get URL and parse it
   // USE the URL contructor as url.parse is deprecated
   // src: https://stackoverflow.com/questions/59375013/node-legacy-url-parse-deprecated-what-to-use-instead
@@ -31,10 +31,23 @@ const server = http.createServer((req, res) => {
   // Get HTTP Headers
   const headers = req.headers;
 
-  // Get Payload if exists
+  return {
+    trimmedPath,
+    queryParams,
+    method,
+    headers,
+    body
+  }
+}
+
+// SERVER IMPLEMENTATION ------------------------------- //
+const server = http.createServer((req, res) => {
+
+  // Create String Decoder
   const decoder = new StringDecoder('utf-8');
+
+  // Decode Payload as it comes in.
   let body = '';
-  // add to buffer as data comes in
   req.on('data', (data) => {
     body += decoder.write(data);
   })
@@ -43,37 +56,34 @@ const server = http.createServer((req, res) => {
   req.on('end', async () => {
     body += decoder.end();
 
-    // Choose request handler based on path
-    const chosenHandler = handlers[trimmedPath] ? handlers[trimmedPath] : handlers.notFound;
-    // create data object for handler
-    const data = {
-      trimmedPath,
-      queryParams,
-      method,
-      headers,
-      body
-    }
+    // create data object for handler from request and body
+    const data = getReqData(req, body);
 
+    // Choose request handler based on path
+    const chosenHandler = (data.trimmedPath && handlers[data.trimmedPath]) ? handlers[data.trimmedPath] : handlers.notFound;
+
+    // Await chosen handler
     const {code = 200, payload = {}} = await chosenHandler(data);
     const payloadString = JSON.stringify(payload);
+
     // Log the requested path
     console.log({code, payload})
 
     // Return Response
+    res.setHeader('content-type', 'application/json');
     res.writeHead(code);
     res.end(payloadString);
   })
 })
 
-// Start the server and listen on port 3000
-const PORT = 3000;
+// START SERVER ---------------------------------------- //
+const PORT = config.port || 3000;
+const ENV = config.environment.toUpperCase();
 server.listen(PORT, () => {
-  console.log(`Server listening on port: ${PORT}`);
+  console.log(`${ENV} Server listening on port: ${PORT}`);
 })
 
-
-
-// Define Handlers
+// DEFINE HANDLERS ------------------------------------- //
 const handlers = {};
 
 handlers.sample = (data) => {
