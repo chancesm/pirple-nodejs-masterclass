@@ -1,12 +1,14 @@
-/*
- * This is my main entrypoint for my RESTful API
- */
+// IMPORTED MODULES ------------------------------------ //
+const fs = require('fs');
 const http = require('http');
+const https = require('https');
 const url = require('url');
 const StringDecoder = require('string_decoder').StringDecoder;
+
 const config = require('./config');
 
-// HELPER FUNCTION ------------------------------------- //
+// HELPER FUNCTIONS ------------------------------------ //
+// Function used to combine the request and body data and return it in a concise object
 const getReqData = (req, body) => {
   // Get URL and parse it
   // USE the URL contructor as url.parse is deprecated
@@ -40,8 +42,8 @@ const getReqData = (req, body) => {
   }
 }
 
-// SERVER IMPLEMENTATION ------------------------------- //
-const server = http.createServer((req, res) => {
+// SERVER HANDLER FUNCTION ----------------------------- //
+const serverHandler = (serverType) => (req, res) => {
 
   // Create String Decoder
   const decoder = new StringDecoder('utf-8');
@@ -59,43 +61,77 @@ const server = http.createServer((req, res) => {
     // create data object for handler from request and body
     const data = getReqData(req, body);
 
-    // Choose request handler based on path
-    const chosenHandler = (data.trimmedPath && handlers[data.trimmedPath]) ? handlers[data.trimmedPath] : handlers.notFound;
+    // Choose request handler based on path (handles index route as well)
+    const chosenHandler =
+      !data.trimmedPath ?
+        handlers.index :
+        router[data.trimmedPath] ?
+          router[data.trimmedPath] : 
+          handlers.notFound;
 
     // Await chosen handler
     const {code = 200, payload = {}} = await chosenHandler(data);
     const payloadString = JSON.stringify(payload);
 
-    // Log the requested path
-    console.log({code, payload})
+    // Log server, path, and response
+    console.log(`${serverType} => ${data.trimmedPath ? data.trimmedPath : '/'}\n`, {code, payload})
 
     // Return Response
     res.setHeader('content-type', 'application/json');
     res.writeHead(code);
     res.end(payloadString);
   })
-})
+}
+
+// SERVER IMPLEMENTATION ------------------------------- //
+// Load https files
+const options = {
+  key: fs.readFileSync('./https/key.pem'),
+  cert: fs.readFileSync('./https/cert.pem'),
+}
+// Create the servers
+const server = http.createServer(serverHandler('HTTP'));
+const secureServer = https.createServer(options, serverHandler('HTTPS'));
 
 // START SERVER ---------------------------------------- //
 const PORT = config.port || 3000;
+const SECURE_PORT = config.securePort || 3001;
 const ENV = config.environment.toUpperCase();
 server.listen(PORT, () => {
-  console.log(`${ENV} Server listening on port: ${PORT}`);
+  console.log(`${ENV} HTTP Server listening on port: ${PORT}`);
+})
+secureServer.listen(SECURE_PORT, () => {
+  console.log(`${ENV} HTTPS Server listening on port: ${SECURE_PORT}`)
 })
 
-// DEFINE HANDLERS ------------------------------------- //
+// DEFINED HANDLERS AND ROUTES ------------------------- //
 const handlers = {};
-
-handlers.sample = (data) => {
-  // Callback (resolve?) HTTP status and a payload object
-  return Promise.resolve({code: 200, payload: {name: 'sample handler'}})
-}
-
-handlers.notFound = (data) => {
-  return Promise.resolve({code: 404});
-}
-
-// Define a router
 const router = {
-  'sample': handlers.sample
+  'ping': handlers.ping,
+  'hello': handlers.hello,
 }
+
+// Handler for '/ping'. Simple health check that utilizes the defined defaults
+handlers.ping = async (data) => ({});
+
+// Handler for '/hello'. Responds with a welcome message
+handlers.hello = async (data) => (
+  {
+    code: 200,
+    payload: {
+      message: "Hello API!"
+    }
+  }
+);
+
+// UTILITY HANDLERS ------------------------------------ //
+// Handler for index ('/') route
+handlers.index = async (data) => ({
+  code: 200,
+  payload: {
+    message: 'This is the index (\'/\') route.'
+  }
+})
+
+// Not Found handler. Returns 404 code
+handlers.notFound = async (data) => ({code: 404});
