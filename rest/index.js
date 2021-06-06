@@ -19,15 +19,20 @@ const server = http.createServer((req, res) => {
   // Clean pathname (remove leading and trailing '/')
   const trimmedPath = path.replace(/^\/+|\/+$/g, '')
 
+  // Get query string as object
+  // NOTE: url.query is deprecated. Use URLSearchParams class instead
+  // Reference: https://nodejs.org/docs/latest-v14.x/api/url.html#url_class_urlsearchparams
+  const queryStringObject = parsedURL.searchParams;
+
   // Get HTTP Method
   const method = req.method.toUpperCase();
-
 
   // Send Response
   res.end('Hello World\n');
 
   // Log the requested path
   console.log(`${method} Request received on path: ${trimmedPath}`)
+  console.log({queryStringObject})
 
 })
 
