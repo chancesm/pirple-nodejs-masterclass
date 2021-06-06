@@ -3,6 +3,7 @@
  */
 const http = require('http');
 const url = require('url');
+const StringDecoder = require('string_decoder').StringDecoder;
 
 //  The server should respond to requests with a string
 const server = http.createServer((req, res) => {
@@ -11,7 +12,7 @@ const server = http.createServer((req, res) => {
   // USE the URL contructor as url.parse is deprecated
   // src: https://stackoverflow.com/questions/59375013/node-legacy-url-parse-deprecated-what-to-use-instead
   const baseURL = req.protocol + '://' + req.headers.host + '/';
-  const parsedURL = new URL(req.url, baseURL);
+  const parsedURL = new url.URL(req.url, baseURL);
 
   // Get Path from URL
   const path = parsedURL.pathname;
@@ -27,16 +28,27 @@ const server = http.createServer((req, res) => {
   // Get HTTP Method
   const method = req.method.toUpperCase();
 
+  // Get Payload if exists
+  const decoder = new StringDecoder('utf-8');
+  let body = '';
+  // add to buffer as data comes in
+  req.on('data', (data) => {
+    body += decoder.write(data);
+  })
+  req.on('end', () => {
+    body += decoder.end();
+
+    // Log the requested path
+    console.log({method, trimmedPath, headers, body})
+  })
+
   // Get HTTP Headers
   const headers = req.headers;
 
   // Send Response
   res.end('Hello World\n');
 
-  // Log the requested path
-  console.log(`${method} Request received on path: ${trimmedPath}`)
-  console.log({queryStringObject})
-  console.log({headers})
+  
 })
 
 // Start the server and listen on port 3000
