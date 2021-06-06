@@ -23,10 +23,13 @@ const server = http.createServer((req, res) => {
   // Get query string as object
   // NOTE: url.query is deprecated. Use URLSearchParams class instead
   // Reference: https://nodejs.org/docs/latest-v14.x/api/url.html#url_class_urlsearchparams
-  const queryStringObject = parsedURL.searchParams;
+  const queryParams = parsedURL.searchParams;
 
   // Get HTTP Method
   const method = req.method.toUpperCase();
+
+  // Get HTTP Headers
+  const headers = req.headers;
 
   // Get Payload if exists
   const decoder = new StringDecoder('utf-8');
@@ -35,20 +38,31 @@ const server = http.createServer((req, res) => {
   req.on('data', (data) => {
     body += decoder.write(data);
   })
-  req.on('end', () => {
+
+  // Handle the request once all data is received
+  req.on('end', async () => {
     body += decoder.end();
 
+    // Choose request handler based on path
+    const chosenHandler = handlers[trimmedPath] ? handlers[trimmedPath] : handlers.notFound;
+    // create data object for handler
+    const data = {
+      trimmedPath,
+      queryParams,
+      method,
+      headers,
+      body
+    }
+
+    const {code = 200, payload = {}} = await chosenHandler(data);
+    const payloadString = JSON.stringify(payload);
     // Log the requested path
-    console.log({method, trimmedPath, headers, body})
+    console.log({code, payload})
+
+    // Return Response
+    res.writeHead(code);
+    res.end(payloadString);
   })
-
-  // Get HTTP Headers
-  const headers = req.headers;
-
-  // Send Response
-  res.end('Hello World\n');
-
-  
 })
 
 // Start the server and listen on port 3000
@@ -56,3 +70,22 @@ const PORT = 3000;
 server.listen(PORT, () => {
   console.log(`Server listening on port: ${PORT}`);
 })
+
+
+
+// Define Handlers
+const handlers = {};
+
+handlers.sample = (data) => {
+  // Callback (resolve?) HTTP status and a payload object
+  return Promise.resolve({code: 200, payload: {name: 'sample handler'}})
+}
+
+handlers.notFound = (data) => {
+  return Promise.resolve({code: 404});
+}
+
+// Define a router
+const router = {
+  'sample': handlers.sample
+}
