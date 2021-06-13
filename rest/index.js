@@ -7,6 +7,20 @@ const StringDecoder = require('string_decoder').StringDecoder;
 
 const config = require('./config');
 
+// IMPORT DEFINED HANDLERS AND ROUTES ------------------------- //
+const defultRouter = require('./routers/default');
+const userRouter = require('./routers/users');
+const handlers = {
+  ...defultRouter.handlers,
+  ...userRouter.handlers,
+};
+const router = {
+  ...defultRouter.router,
+  ...userRouter.router,
+}
+
+
+
 // HELPER FUNCTIONS ------------------------------------ //
 // Function used to combine the request and body data and return it in a concise object
 const getReqData = (req, body) => {
@@ -103,35 +117,3 @@ server.listen(PORT, () => {
 secureServer.listen(SECURE_PORT, () => {
   console.log(`${ENV} HTTPS Server listening on port: ${SECURE_PORT}`)
 })
-
-// DEFINED HANDLERS AND ROUTES ------------------------- //
-const handlers = {};
-const router = {
-  'ping': handlers.ping,
-  'hello': handlers.hello,
-}
-
-// Handler for '/ping'. Simple health check that utilizes the defined defaults
-handlers.ping = async (data) => ({});
-
-// Handler for '/hello'. Responds with a welcome message
-handlers.hello = async (data) => (
-  {
-    code: 200,
-    payload: {
-      message: "Hello API!"
-    }
-  }
-);
-
-// UTILITY HANDLERS ------------------------------------ //
-// Handler for index ('/') route
-handlers.index = async (data) => ({
-  code: 200,
-  payload: {
-    message: 'This is the index (\'/\') route.'
-  }
-})
-
-// Not Found handler. Returns 404 code
-handlers.notFound = async (data) => ({code: 404});
